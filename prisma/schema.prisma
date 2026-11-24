@@ -1,0 +1,464 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ======================================================
+// ENUMS
+// ======================================================
+
+enum ModalidadCarrera {
+  PRESENCIAL
+  SEMIPRESENCIAL
+  VIRTUAL
+  HIBRIDA
+}
+
+enum DiaSemana {
+  LUNES
+  MARTES
+  MIERCOLES
+  JUEVES
+  VIERNES
+  SABADO
+  DOMINGO
+}
+
+enum CategoriaActividad {
+  DOCENCIA
+  TUTORIA
+  INVESTIGACION
+  VINCULACION
+  GESTION
+  OTRA
+}
+
+enum EstadoPlanTrabajo {
+  BORRADOR
+  ENVIADO
+  REVISADO
+  APROBADO
+  RECHAZADO
+}
+
+enum TipoRevisionPlan {
+  REVISION
+  APROBACION
+}
+
+enum DecisionRevision {
+  APROBADO
+  RECHAZADO
+}
+
+// ======================================================
+// ROL
+// ======================================================
+
+model Rol {
+  id       Int       @id @default(autoincrement())
+  nombre   String    @unique
+  usuarios Usuario[]
+}
+
+// ======================================================
+// USUARIO
+// ======================================================
+
+model Usuario {
+  id         Int      @id @default(autoincrement())
+  nombre     String
+  contrasena String
+  creadoEn   DateTime @default(now())
+  rolId      Int
+
+  rol Rol @relation(fields: [rolId], references: [id])
+}
+
+// ======================================================
+// CARRERA
+// ======================================================
+
+model Carrera {
+  id        Int              @id @default(autoincrement())
+  nombre    String
+  codigo    String           @unique
+  estado    Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  modalidad ModalidadCarrera @default(PRESENCIAL)
+
+  Horario Horario[]
+  niveles Nivel[]
+
+  docentesCarrera        DocenteCarrera[]
+  planesTrabajo          PlanTrabajoDocente[]
+  configuracionesHorario ConfiguracionHorarioCarrera[]
+}
+
+// ======================================================
+// NIVEL
+// ======================================================
+
+model Nivel {
+  id          Int          @id @default(autoincrement())
+  nombre      String
+  semestre    Int
+  carreraId   Int
+  asignaturas Asignatura[]
+  Horario     Horario[]
+
+  carrera Carrera @relation(fields: [carreraId], references: [id])
+}
+
+// ======================================================
+// DEDICACION DOCENTE
+// ======================================================
+
+model DedicacionDocente {
+  id             Int      @id @default(autoincrement())
+  nombre         String   @unique
+  horasSemanales Int
+  activo         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  docentes Docente[]
+}
+
+// ======================================================
+// DOCENTE
+// ======================================================
+
+model Docente {
+  id           Int      @id @default(autoincrement())
+  nombres      String
+  apellidos    String
+  cedula       String   @unique
+  correo       String   @unique
+  telefono     String?
+  createdAt    DateTime @default(now())
+  estado       Boolean  @default(true)
+  titulo       String?
+  dedicacionId Int?
+
+  dedicacion DedicacionDocente? @relation(fields: [dedicacionId], references: [id])
+
+  AsignaturaDocente AsignaturaDocente[]
+  Horario           Horario[]
+
+  carreras            DocenteCarrera[]
+  planesTrabajo       PlanTrabajoDocente[]
+  horariosActividades HorarioActividadDocente[]
+}
+
+// ======================================================
+// HISTORIAL DOCENTE - CARRERA
+// ======================================================
+
+model DocenteCarrera {
+  id          Int       @id @default(autoincrement())
+  docenteId   Int
+  carreraId   Int
+  fechaInicio DateTime
+  fechaFin    DateTime?
+  activo      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  docente Docente @relation(fields: [docenteId], references: [id])
+  carrera Carrera @relation(fields: [carreraId], references: [id])
+
+  @@unique([docenteId, carreraId, fechaInicio])
+}
+
+// ======================================================
+// ASIGNATURA
+// ======================================================
+
+model Asignatura {
+  id          Int    @id @default(autoincrement())
+  codigo      String @unique
+  nombre      String
+  creditos    Int
+  horasSemana Int
+  nivelId     Int
+
+  nivel Nivel @relation(fields: [nivelId], references: [id])
+
+  AsignaturaDocente AsignaturaDocente[]
+  Horario           Horario[]
+}
+
+// ======================================================
+// AULA
+// ======================================================
+
+model Aula {
+  id        Int      @id @default(autoincrement())
+  codigo    String   @unique
+  capacidad Int?
+  tipo      String?
+  estado    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  horarios Horario[]
+}
+
+// ======================================================
+// PERIODO ACADEMICO
+// ======================================================
+
+model PeriodoAcademico {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  fechaInicio DateTime
+  fechaFin    DateTime
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  codigo String? @unique
+
+  Horario Horario[]
+
+  planesTrabajo          PlanTrabajoDocente[]
+  configuracionesHorario ConfiguracionHorarioCarrera[]
+  horariosActividades    HorarioActividadDocente[]
+}
+
+// ======================================================
+// SECCION
+// ======================================================
+
+model Seccion {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  createdAt DateTime @default(now())
+
+  Horario Horario[]
+}
+
+// ======================================================
+// HORARIO ACADEMICO
+//
+// diaSemana se mantiene como String por ahora.
+// No vamos a modificar todavía los datos existentes.
+// ======================================================
+
+model Horario {
+  id           Int      @id @default(autoincrement())
+  diaSemana    String
+  horaInicio   String
+  horaFin      String
+  docenteId    Int
+  asignaturaId Int
+  aulaId       Int
+  periodoId    Int
+  seccionId    Int
+  createdAt    DateTime @default(now())
+  carreraId    Int
+  nivelId      Int
+
+  Asignatura       Asignatura       @relation(fields: [asignaturaId], references: [id])
+  aula             Aula             @relation(fields: [aulaId], references: [id])
+  Carrera          Carrera          @relation(fields: [carreraId], references: [id])
+  Docente          Docente          @relation(fields: [docenteId], references: [id])
+  Nivel            Nivel            @relation(fields: [nivelId], references: [id])
+  PeriodoAcademico PeriodoAcademico @relation(fields: [periodoId], references: [id])
+  Seccion          Seccion          @relation(fields: [seccionId], references: [id])
+
+  @@unique([diaSemana, horaInicio, horaFin, aulaId])
+  @@unique([diaSemana, horaInicio, horaFin, docenteId])
+  @@unique([diaSemana, horaInicio, horaFin, seccionId])
+}
+
+// ======================================================
+// ASIGNATURA - DOCENTE
+// ======================================================
+
+model AsignaturaDocente {
+  id           Int @id @default(autoincrement())
+  docenteId    Int
+  asignaturaId Int
+
+  Asignatura Asignatura @relation(fields: [asignaturaId], references: [id])
+  Docente    Docente    @relation(fields: [docenteId], references: [id])
+
+  @@unique([docenteId, asignaturaId])
+}
+
+// ======================================================
+// CONFIGURACION DEL HORARIO DE CADA CARRERA
+// ======================================================
+
+model ConfiguracionHorarioCarrera {
+  id        Int @id @default(autoincrement())
+  carreraId Int
+  periodoId Int
+
+  horaInicio String
+  horaFin    String
+
+  lunes     Boolean @default(true)
+  martes    Boolean @default(true)
+  miercoles Boolean @default(true)
+  jueves    Boolean @default(true)
+  viernes   Boolean @default(true)
+  sabado    Boolean @default(false)
+  domingo   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  carrera Carrera          @relation(fields: [carreraId], references: [id])
+  periodo PeriodoAcademico @relation(fields: [periodoId], references: [id])
+
+  @@unique([carreraId, periodoId])
+}
+
+// ======================================================
+// CATALOGO DE ACTIVIDADES DOCENTES
+//
+// Ejemplos:
+// DOC.1
+// DOC.2
+// DOC.4
+// DOC.5
+// TUT.1
+// INV.9
+// VIN.4
+// GES.14
+// ======================================================
+
+model CatalogoActividad {
+  id          Int                @id @default(autoincrement())
+  codigo      String             @unique
+  nombre      String
+  categoria   CategoriaActividad
+  descripcion String?
+
+  requiereInforme   Boolean @default(true)
+  requiereEvidencia Boolean @default(true)
+
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  detallesPlan DetallePlanTrabajo[]
+}
+
+// ======================================================
+// PLAN DE TRABAJO DEL DOCENTE
+// ======================================================
+
+model PlanTrabajoDocente {
+  id              Int               @id @default(autoincrement())
+  docenteId       Int
+  periodoId       Int
+  carreraId       Int
+  fechaInicio     DateTime
+  fechaFin        DateTime
+  horasRequeridas Int
+  estado          EstadoPlanTrabajo @default(BORRADOR)
+
+  version      Int     @default(1)
+  enCorreccion Boolean @default(false)
+
+  observacion String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  docente Docente          @relation(fields: [docenteId], references: [id])
+  periodo PeriodoAcademico @relation(fields: [periodoId], references: [id])
+  carrera Carrera          @relation(fields: [carreraId], references: [id])
+
+  detalles   DetallePlanTrabajo[]
+  revisiones RevisionPlanTrabajo[]
+
+  @@unique([docenteId, periodoId, carreraId])
+}
+
+// ======================================================
+// DETALLE DEL PLAN DE TRABAJO
+// ======================================================
+
+model DetallePlanTrabajo {
+  id          Int @id @default(autoincrement())
+  planId      Int
+  actividadId Int
+
+  horasSemanales Int
+
+  observacion String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  plan      PlanTrabajoDocente @relation(fields: [planId], references: [id], onDelete: Cascade)
+  actividad CatalogoActividad  @relation(fields: [actividadId], references: [id])
+
+  horarios HorarioActividadDocente[]
+
+  @@unique([planId, actividadId])
+}
+
+// ======================================================
+// HORARIO DE ACTIVIDADES DEL DOCENTE
+//
+// Tutorías
+// Docencia extracurricular
+// Investigación
+// Vinculación
+// Gestión
+// ======================================================
+
+model HorarioActividadDocente {
+  id            Int @id @default(autoincrement())
+  docenteId     Int
+  periodoId     Int
+  detallePlanId Int
+
+  diaSemana DiaSemana
+
+  horaInicio String
+  horaFin    String
+
+  fechaInicio DateTime
+  fechaFin    DateTime
+
+  ubicacion   String?
+  observacion String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  docente     Docente            @relation(fields: [docenteId], references: [id])
+  periodo     PeriodoAcademico   @relation(fields: [periodoId], references: [id])
+  detallePlan DetallePlanTrabajo @relation(fields: [detallePlanId], references: [id], onDelete: Cascade)
+
+  @@unique([docenteId, periodoId, diaSemana, horaInicio, horaFin])
+}
+
+model RevisionPlanTrabajo {
+  id       Int              @id @default(autoincrement())
+  planId   Int
+  tipo     TipoRevisionPlan
+  decision DecisionRevision
+
+  versionPlan Int @default(1)
+
+  nombreResponsable String
+  cargoResponsable  String?
+  observacion       String?
+
+  fecha DateTime @default(now())
+
+  plan PlanTrabajoDocente @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([fecha])
+}
